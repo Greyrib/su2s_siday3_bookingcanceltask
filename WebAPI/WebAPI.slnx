@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="BackOffice/BackOffice.csproj" Id="6527a43f-6c0e-4641-b6a7-f05ad0feabf3" />
+  <Project Path="EmailService/EmailService.csproj" Id="79890d7f-3691-4570-ab1d-9b03ac1ed89f" />
   <Project Path="WebAPI/WebAPI.csproj" />
 </Solution>
