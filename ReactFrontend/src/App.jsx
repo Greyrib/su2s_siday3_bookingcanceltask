@@ -12,15 +12,15 @@ function App() {
     const data = {
       name: formData.get("Name"),
       email: formData.get("E-mejl"),
-      dropdownType: formData.get("DropdownSelection"),
-      bookingType: formData.get("BookingType")
+      trip: formData.get("DropdownSelection"),
+      tourtype: formData.get("BookingType")
     };
 
     console.log(data);
     console.log(JSON.stringify(data));
 
     try {
-      const response = await fetch("/api/users", {
+      const response = await fetch("https://localhost:7206/api/trip/book", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -68,8 +68,8 @@ function App() {
 
             <FormControl>
               <RadioGroup row name="row-radio-buttons-group" name="BookingType">
-                <FormControlLabel value="Book" control={<Radio />} label="Book" />
-                <FormControlLabel value="Cancel" control={<Radio />} label="Cancel" />
+                <FormControlLabel value="book" control={<Radio />} label="Book" />
+                <FormControlLabel value="cancel" control={<Radio />} label="Cancel" />
               </RadioGroup>
             </FormControl>
 

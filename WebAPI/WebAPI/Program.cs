@@ -13,6 +13,15 @@ namespace WebAPI
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 
+            builder.Services.AddCors((options) => {
+                options.AddPolicy(name: "AllowTourOrigin", policy =>
+                {
+                    policy.AllowAnyOrigin()//WithOrigins("http://localhost:5173/")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+                });
+            });
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -21,10 +30,13 @@ namespace WebAPI
                 app.MapOpenApi();
             }
 
+
+
             app.UseHttpsRedirection();
 
             app.UseAuthorization();
 
+            app.UseCors("AllowTourOrigin");
 
             app.MapControllers();
 
