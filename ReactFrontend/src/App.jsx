@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { Box, Button, Select, InputLabel, FormControl, Typography, TextField, MenuItem, RadioGroup, FormControlLabel, Radio } from '@mui/material'
 
+// Prereq: To run, it requires 'packages' used ; get with 'npm install'
+
+// Boot up with :
+// npm run dev
+
+
 function App() {
   const [count, setCount] = useState(0)
 
