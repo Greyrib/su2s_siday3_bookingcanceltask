@@ -4,6 +4,9 @@ using RabbitMQ.AMQP.Client.Impl;
 // Run this with
 // dotnet run --project thisproject.csproj
 
+// NOTE The tutorial uses the "args" from startup of the project as binding keys
+// These projects are as of 14-09-2k26 made with specific bindings instead
+
 Console.WriteLine("Hello, BackOfficers!");
 
 const string brokerUri = "amqp://guest:guest@localhost:5672/%2f";
