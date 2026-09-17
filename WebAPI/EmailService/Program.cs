@@ -1,5 +1,6 @@
 ﻿using RabbitMQ.AMQP.Client;
 using RabbitMQ.AMQP.Client.Impl;
+using System.Xml.Linq;
 
 // Run this with
 // dotnet run --project thisproject.csproj
@@ -8,6 +9,13 @@ Console.WriteLine("Hello, Emailers!");
 
 const string brokerUri = "amqp://guest:guest@localhost:5672/%2f";
 const string exchangeName = "logs_topic";
+
+const string queueNameEmail = "emailQueue";
+const string emailBindingKey = "tour.book";
+
+const string dlxName = "tour-dlx";
+const string dlqName = "tour-dlq";
+const string dlqRoutingKey = "tour.dead";
 
 ConnectionSettings settings = ConnectionSettingsBuilder.Create()
     .Uri(new Uri(brokerUri))
@@ -20,17 +28,32 @@ IConnection connection = await environment.CreateConnectionAsync();
 try
 {
     IManagement management = connection.Management();
+
+    //DLX Exchange
+    IExchangeSpecification dlxSpec = management.Exchange(dlxName).Type(ExchangeType.FANOUT);
+    await dlxSpec.DeclareAsync();
+
+    //DLX Queue
+    IQueueSpecification dlqSpec = management.Queue(dlqName).Type(QueueType.QUORUM);
+    await dlqSpec.DeclareAsync();
+
+    //Bind DLQ to DLX
+    await management.Binding()
+        .SourceExchange(dlxSpec)
+        .DestinationQueue(dlqName)
+        .BindAsync();
+
     IExchangeSpecification exchangeSpec = management.Exchange(exchangeName).Type("topic");
     await exchangeSpec.DeclareAsync();
 
-    IQueueSpecification tempQueue = management.Queue().Exclusive(true).AutoDelete(true);
+    IQueueSpecification tempQueue = management.Queue(queueNameEmail)/*.Exclusive(true).AutoDelete(true)*/;
     IQueueInfo queueInfo = await tempQueue.DeclareAsync();
     string queueName = queueInfo.Name();
 
     IBindingSpecification binding = management.Binding()
         .SourceExchange(exchangeSpec)
         .DestinationQueue(queueName)
-        .Key("tour.book");
+        .Key(emailBindingKey);
     await binding.BindAsync();
 
     IConsumer consumer = await connection.ConsumerBuilder()
@@ -39,8 +62,17 @@ try
         {
             string body = message.BodyAsString();
             string routingKey = RoutingKey(message);
-            Console.WriteLine($" [x] Received '{routingKey}':'{body}'");
-            ctx.Accept();
+
+            try
+            {
+                Console.WriteLine($" [x] Received '{routingKey}':'{body}'");
+                ctx.Accept();
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine($"[!] Bad Message '{routingKey}':'{body}' - {e.Message}");
+                ctx.Discard();
+            }
             return Task.CompletedTask;
         })
         .BuildAndStartAsync();

@@ -33,6 +33,16 @@ public class TripController : ControllerBase
     const string brokerUri = "amqp://guest:guest@localhost:5672/%2f";
     const string exchangeName = "logs_topic";
 
+    const string queueNameBackOffice = "backOfficeQueue";
+    const string backOfficeBindingKey = "tour.*";
+            
+    const string queueNameEmail = "emailQueue";
+    const string emailBindingKey = "tour.book";
+
+    //const string dlxName = "tour-dlx";
+    //const string dlqName = "tour-dlq";
+    //const string dlqRoutingKey = "tour.dead";
+
     async Task Send_Message(string message, string routingKey)
     {
         ConnectionSettings settings = ConnectionSettingsBuilder.Create()
@@ -42,12 +52,54 @@ public class TripController : ControllerBase
 
         IEnvironment environment = AmqpEnvironment.Create(settings);
         IConnection connection = await environment.CreateConnectionAsync();
-
+    
         try
         {
             IManagement management = connection.Management();
+
+            ////DLX Exchange
+            //IExchangeSpecification dlxSpec = management.Exchange(dlxName).Type(ExchangeType.FANOUT);
+            //await dlxSpec.DeclareAsync();
+
+            ////DLX Queue
+            //IQueueSpecification dlqSpec = management.Queue(dlqName).Type(QueueType.QUORUM);
+            //await dlqSpec.DeclareAsync();
+
+            ////Bind DLQ to DLX
+            //await management.Binding()
+            //    .SourceExchange(dlxSpec)
+            //    .DestinationQueue(dlqName)
+            //    .BindAsync();
+
+            //Main Exchange
             IExchangeSpecification exchangeSpec = management.Exchange(exchangeName).Type("topic");
             await exchangeSpec.DeclareAsync();
+
+            ////Create BackOffice Queue
+            //IQueueSpecification queueBackOffice = management.Queue(queueNameBackOffice)
+            //    .Type(QueueType.QUORUM)
+            //    .DeadLetterExchange(dlxName)
+            //    .DeadLetterRoutingKey(dlqRoutingKey)
+            //    .MessageTtl(TimeSpan.FromSeconds(30))/*.Exclusive(true).AutoDelete(true)*/;
+            //IQueueInfo queueInfoBackOffice = await queueBackOffice.DeclareAsync();
+            
+            ////Create Email Queue
+            //IQueueSpecification queueEmail = management.Queue(queueNameEmail)/*.Exclusive(true).AutoDelete(true)*/;
+            //IQueueInfo queueInfoEmail = await queueEmail.DeclareAsync();
+
+            ////Bind BackOffice Queue
+            //IBindingSpecification bindingBackOffice = management.Binding()
+            //.SourceExchange(exchangeSpec)
+            //.DestinationQueue(queueNameBackOffice)
+            //.Key(backOfficeBindingKey);
+            //await bindingBackOffice.BindAsync();
+
+            ////Bind BackOffice Queue
+            //IBindingSpecification bindingEmail = management.Binding()
+            //.SourceExchange(exchangeSpec)
+            //.DestinationQueue(queueNameEmail)
+            //.Key(emailBindingKey);
+            //await bindingEmail.BindAsync();
 
             IPublisher publisher = await connection.PublisherBuilder().Exchange(exchangeName).Key(routingKey).BuildAsync();
             try
