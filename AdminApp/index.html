@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RabbitMQ Routing Trace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #12181f;
+        --panel-2: #161d26;
+        --line: #26303b;
+        --ink: #e7edf3;
+        --ink-dim: #8b98a5;
+        --ink-faint: #5b6672;
+        --amber: #e8a33d;
+        --amber-dim: #4a3a1f;
+        --teal: #4dd0c4;
+        --teal-dim: #1c3a37;
+        --violet: #9b8cf2;
+        --font-sans: "Inter", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+      }
+      :root:not([data-theme="light"]) {
+        color-scheme: dark;
+      }
+      @media (prefers-color-scheme: light) {
+        :root:not([data-theme="dark"]) {
+          --bg: #f4f5f7;
+          --panel: #ffffff;
+          --panel-2: #f0f1f4;
+          --line: #dde1e6;
+          --ink: #1a2028;
+          --ink-dim: #5b6672;
+          --ink-faint: #8b98a5;
+          --amber-dim: #fbe8c9;
+          --teal-dim: #d6f3ef;
+        }
+      }
+      :root[data-theme="light"] {
+        --bg: #f4f5f7;
+        --panel: #ffffff;
+        --panel-2: #f0f1f4;
+        --line: #dde1e6;
+        --ink: #1a2028;
+        --ink-dim: #5b6672;
+        --ink-faint: #8b98a5;
+        --amber-dim: #fbe8c9;
+        --teal-dim: #d6f3ef;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+      }
+      body {
+        font-family: var(--font-sans);
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+      }
+      #root {
+        min-height: 100vh;
+      }
+
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 40px 24px 80px;
+      }
+
+      .masthead {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 24px;
+        flex-wrap: wrap;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 20px;
+        margin-bottom: 28px;
+      }
+      .masthead h1 {
+        font-size: 26px;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        margin: 0 0 6px;
+      }
+      .masthead .sub {
+        color: var(--ink-dim);
+        font-size: 14px;
+        margin: 0;
+        max-width: 60ch;
+      }
+      .masthead .source {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--ink-faint);
+        text-align: right;
+      }
+      .masthead .source b {
+        color: var(--ink-dim);
+        font-weight: 600;
+      }
+
+      .stat-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        background: var(--line);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 32px;
+      }
+      .stat {
+        background: var(--panel);
+        padding: 16px 18px;
+      }
+      .stat .n {
+        font-family: var(--font-mono);
+        font-size: 24px;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .stat .l {
+        margin-top: 6px;
+        font-size: 12.5px;
+        color: var(--ink-dim);
+      }
+
+      .section-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ink-dim);
+        margin: 0 0 14px;
+      }
+
+      .diagram-panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 32px;
+      }
+
+      svg text {
+        font-family: var(--font-mono);
+      }
+      .node-label {
+        font-size: 13px;
+        font-weight: 600;
+        fill: var(--ink);
+      }
+      .node-sub {
+        font-size: 10.5px;
+        fill: var(--ink-faint);
+      }
+      .edge-count {
+        font-size: 11px;
+        fill: var(--ink-dim);
+        font-weight: 500;
+      }
+
+      .queue-btn {
+        cursor: pointer;
+      }
+      .queue-btn rect {
+        transition:
+          stroke 0.15s ease,
+          filter 0.15s ease;
+      }
+      .queue-btn:hover rect {
+        filter: brightness(1.15);
+      }
+
+      .legend {
+        display: flex;
+        gap: 20px;
+        margin-top: 18px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        flex-wrap: wrap;
+      }
+      .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--ink-dim);
+        font-family: var(--font-mono);
+      }
+      .legend-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 2px;
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .chip {
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        padding: 7px 13px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        color: var(--ink-dim);
+        cursor: pointer;
+        transition: all 0.12s ease;
+        white-space: nowrap;
+      }
+      .chip:hover {
+        border-color: var(--ink-faint);
+        color: var(--ink);
+      }
+      .chip.active {
+        background: var(--ink);
+        color: var(--bg);
+        border-color: var(--ink);
+      }
+      .search {
+        margin-left: auto;
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+        background: var(--panel-2);
+        border: 1px solid var(--line);
+        color: var(--ink);
+        padding: 7px 13px;
+        border-radius: 999px;
+        outline: none;
+        min-width: 200px;
+      }
+      .search::placeholder {
+        color: var(--ink-faint);
+      }
+      .search:focus {
+        border-color: var(--ink-faint);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+        font-family: var(--font-mono);
+        font-size: 12.5px;
+      }
+      thead th {
+        text-align: left;
+        font-weight: 600;
+        color: var(--ink-dim);
+        font-size: 11px;
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        background: var(--panel-2);
+        position: sticky;
+        top: 0;
+      }
+      tbody td {
+        padding: 9px 14px;
+        border-bottom: 1px solid var(--line);
+        color: var(--ink);
+        vertical-align: top;
+      }
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+      tbody tr:hover {
+        background: var(--panel-2);
+      }
+
+      .tbl-scroll {
+        max-height: 420px;
+        overflow: auto;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+      }
+      .tbl-scroll table {
+        border: none;
+        border-radius: 0;
+      }
+
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 5px;
+        font-size: 11px;
+        font-weight: 600;
+      }
+      .badge.pub {
+        background: var(--amber-dim);
+        color: var(--amber);
+      }
+      .badge.rcv-email {
+        background: var(--teal-dim);
+        color: var(--teal);
+      }
+      .badge.rcv-back {
+        background: rgba(155, 140, 242, 0.16);
+        color: var(--violet);
+      }
+
+      .payload-field {
+        color: var(--ink-dim);
+      }
+      .payload-val {
+        color: var(--ink);
+      }
+
+      .empty-row td {
+        text-align: center;
+        color: var(--ink-faint);
+        padding: 28px;
+      }
+
+      .footnote {
+        margin-top: 14px;
+        font-size: 12px;
+        color: var(--ink-faint);
+      }
+
+      @media (max-width: 640px) {
+        .stat-row {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        .masthead {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+        .masthead .source {
+          text-align: left;
+        }
+        .search {
+          margin-left: 0;
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-presets="react" data-type="module">
+      const { useState, useEffect, useMemo } = React;
+
+      // ---------- Parsing ----------
+      function parseLog(raw) {
+        if (!raw) return [];
+        const blocks = raw
+          .split(/^={10,}$/m)
+          .map((b) => b.trim())
+          .filter(Boolean);
+        const entries = [];
+        blocks.forEach((block, i) => {
+          const headerMatch = block.match(
+            /^([\d\-T:.+]+):\s*Message (published|received)/m,
+          );
+          if (!headerMatch) return;
+          const timestamp = headerMatch[1];
+          const type = headerMatch[2];
+
+          const get = (label) => {
+            const re = new RegExp(label + ":\\s*(.+)");
+            const m = block.match(re);
+            return m ? m[1].trim() : null;
+          };
+
+          const exchange = get("Exchange");
+          const routingKeysRaw = get("Routing keys");
+          const routingKeys = routingKeysRaw
+            ? [...routingKeysRaw.matchAll(/<<"([^"]+)">>/g)].map((m) => m[1])
+            : [];
+          const routedQueuesRaw = get("Routed queues");
+          let routedQueues = routedQueuesRaw
+            ? [...routedQueuesRaw.matchAll(/<<"([^"]+)">>/g)].map((m) => m[1])
+            : [];
+
+          // Fall back to routing keys for direct publishes to default exchange
+          if (
+            type === "published" &&
+            routedQueues.length === 0 &&
+            routingKeys.length > 0
+          ) {
+            routedQueues = [...routingKeys];
+          }
+
+          const queue = get("Queue");
+          const connection = get("Connection");
+
+          const payloadMatch = block.match(/Payload:\s*\n?({[\s\S]*})/);
+          let payload = null;
+          if (payloadMatch) {
+            try {
+              payload = JSON.parse(payloadMatch[1].trim());
+            } catch (e) {
+              payload = null;
+            }
+          }
+
+          entries.push({
+            id: i,
+            timestamp,
+            type,
+            exchange,
+            routingKeys,
+            routedQueues,
+            queue,
+            connection,
+            payload,
+          });
+        });
+        return entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      }
+
+      // ---------- Derived data ----------
+      // Update summarize to collect queues from routedQueues and routingKeys
+      function summarize(entries) {
+        const published = entries.filter((e) => e.type === "published");
+        const received = entries.filter((e) => e.type === "received");
+        const queues = {};
+
+        entries.forEach((e) => {
+          // 1. Count received messages per queue
+          if (e.queue) {
+            queues[e.queue] = (queues[e.queue] || 0) + 1;
+          }
+          // 2. Count published messages target/routed queues
+          if (e.type === "published" && e.routedQueues) {
+            e.routedQueues.forEach((q) => {
+              queues[q] = (queues[q] || 0) + 1;
+            });
+          }
+        });
+
+        const mainPub =
+          published.find((e) => e.exchange === "logs_topic") || published[0];
+        const exchange = mainPub?.exchange || "logs_topic";
+        const routingKey = mainPub?.routingKeys?.[0] || "—";
+
+        return { published, received, queues, exchange, routingKey };
+      }
+
+      // Update badge styling for invalid / dead letter queues
+      function queueBadgeClass(q) {
+        if (q === "emailQueue") return "rcv-email";
+        if (q === "backOfficeQueue") return "rcv-back";
+        if (q && q.includes("invalid")) return "pub"; // Amber badge for invalid
+        return "rcv-email";
+      }
+
+      function fmtTime(ts) {
+        if (!ts) return "";
+        const m = ts.match(/T(\d{2}:\d{2}:\d{2}\.\d+)/);
+        return m ? m[1] : ts;
+      }
+
+      // ---------- Diagram ----------
+      function RoutingDiagram({
+        entries,
+        queues,
+        exchange,
+        routingKey,
+        activeQueue,
+        onSelectQueue,
+      }) {
+        const queueNames = Object.keys(queues);
+        const spacing = 100;
+        const diagramHeight = Math.max(320, queueNames.length * spacing + 80);
+        const exX = 140;
+        const exY = diagramHeight / 2;
+        const qX = 620;
+        const startY = exY - ((queueNames.length - 1) * spacing) / 2;
+
+        // Dynamic palette for all queues
+        const colorPalette = ["var(--teal)", "var(--violet)", "var(--amber)"];
+        const colors = {};
+        const colorsDim = {};
+
+        queueNames.forEach((q, idx) => {
+          if (q === "emailQueue") {
+            colors[q] = "var(--teal)";
+            colorsDim[q] = "var(--teal-dim)";
+          } else if (q === "backOfficeQueue") {
+            colors[q] = "var(--violet)";
+            colorsDim[q] = "rgba(155, 140, 242, 0.16)";
+          } else {
+            colors[q] = "var(--amber)";
+            colorsDim[q] = "var(--amber-dim)";
+          }
+        });
+
+        return (
+          <svg
+            viewBox={`0 0 800 ${diagramHeight}`}
+            style={{ width: "100%", height: "auto", display: "block" }}
+          >
+            <defs>
+              <marker
+                id="arrow"
+                markerWidth="8"
+                markerHeight="8"
+                refX="6"
+                refY="3"
+                orient="auto"
+              >
+                <path d="M0,0 L6,3 L0,6 Z" fill="var(--ink-faint)" />
+              </marker>
+              {queueNames.map((q) => (
+                <marker
+                  key={q}
+                  id={`arrow-${q}`}
+                  markerWidth="8"
+                  markerHeight="8"
+                  refX="6"
+                  refY="3"
+                  orient="auto"
+                >
+                  <path
+                    d="M0,0 L6,3 L0,6 Z"
+                    fill={colors[q] || "var(--ink-faint)"}
+                  />
+                </marker>
+              ))}
+            </defs>
+
+            <g>
+              <rect
+                x="20"
+                y={exY - 24}
+                width="110"
+                height="48"
+                rx="8"
+                fill="var(--panel-2)"
+                stroke="var(--line)"
+              />
+              <text
+                x="75"
+                y={exY - 2}
+                textAnchor="middle"
+                className="node-label"
+              >
+                producer
+              </text>
+              <text
+                x="75"
+                y={exY + 14}
+                textAnchor="middle"
+                className="node-sub"
+              >
+                tour.book
+              </text>
+            </g>
+
+            <g>
+              <rect
+                x={exX + 20}
+                y={exY - 30}
+                width="150"
+                height="60"
+                rx="8"
+                fill="var(--panel-2)"
+                stroke="var(--amber)"
+                strokeWidth="1.5"
+              />
+              <text
+                x={exX + 95}
+                y={exY - 6}
+                textAnchor="middle"
+                className="node-label"
+              >
+                {exchange}
+              </text>
+              <text
+                x={exX + 95}
+                y={exY + 12}
+                textAnchor="middle"
+                className="node-sub"
+              >
+                topic exchange
+              </text>
+            </g>
+            <line
+              x1="130"
+              y1={exY}
+              x2={exX + 20}
+              y2={exY}
+              stroke="var(--ink-faint)"
+              strokeWidth="1.5"
+              markerEnd="url(#arrow)"
+            />
+
+            <text
+              x={exX + 95}
+              y={exY + 46}
+              textAnchor="middle"
+              className="node-sub"
+              fill="var(--amber)"
+            >
+              rk: {routingKey}
+            </text>
+
+            {queueNames.map((q, i) => {
+              const y = startY + i * spacing;
+              const isActive = activeQueue === q;
+              const count = queues[q];
+              return (
+                <g key={q}>
+                  <path
+                    d={`M ${exX + 170} ${exY} C ${exX + 320} ${exY}, ${qX - 130} ${y}, ${qX} ${y}`}
+                    fill="none"
+                    stroke={
+                      isActive ? colors[q] || "var(--ink-faint)" : "var(--line)"
+                    }
+                    strokeWidth={isActive ? 2.5 : 1.5}
+                    markerEnd={`url(#arrow-${q})`}
+                    opacity={activeQueue && !isActive ? 0.3 : 1}
+                    style={{ transition: "all 0.15s ease" }}
+                  />
+                  <text
+                    x={(exX + 170 + qX) / 2}
+                    y={(exY + y) / 2 - 10}
+                    textAnchor="middle"
+                    className="edge-count"
+                    opacity={activeQueue && !isActive ? 0.3 : 1}
+                  >
+                    {count} msg{count === 1 ? "" : "s"}
+                  </text>
+                  <g
+                    className="queue-btn"
+                    onClick={() => onSelectQueue(isActive ? null : q)}
+                    opacity={activeQueue && !isActive ? 0.45 : 1}
+                  >
+                    <rect
+                      x={qX}
+                      y={y - 26}
+                      width="150"
+                      height="52"
+                      rx="8"
+                      fill={colorsDim[q] || "var(--panel-2)"}
+                      stroke={colors[q] || "var(--line)"}
+                      strokeWidth={isActive ? 2 : 1}
+                    />
+                    <text
+                      x={qX + 75}
+                      y={y - 4}
+                      textAnchor="middle"
+                      className="node-label"
+                    >
+                      {q}
+                    </text>
+                    <text
+                      x={qX + 75}
+                      y={y + 13}
+                      textAnchor="middle"
+                      className="node-sub"
+                    >
+                      consumer queue
+                    </text>
+                  </g>
+                </g>
+              );
+            })}
+          </svg>
+        );
+      }
+
+      // ---------- App ----------
+      function App() {
+        const [logText, setLogText] = useState("");
+        const [filterType, setFilterType] = useState("all");
+        const [activeQueue, setActiveQueue] = useState(null);
+        const [query, setQuery] = useState("");
+
+        // 1. Initial Fetch & Hot Reload Listener
+        // Inside index.html -> App component
+        useEffect(() => {
+          // Fetch initial content from the custom dev server endpoint
+          fetch("/api/log")
+            .then((res) => res.text())
+            .then((data) => setLogText(data))
+            .catch((err) => console.error("Error loading log file:", err));
+
+          // Listen for live file changes over Vite's HMR WebSocket
+          if (import.meta.hot) {
+            import.meta.hot.accept();
+
+            const handleUpdate = (data) => {
+              setLogText(data.content);
+            };
+
+            import.meta.hot.on("log-file-updated", handleUpdate);
+
+            return () => {
+              import.meta.hot.off("log-file-updated", handleUpdate);
+            };
+          }
+        }, []);
+
+        const entries = useMemo(() => parseLog(logText), [logText]);
+        const { published, received, queues, exchange, routingKey } = useMemo(
+          () => summarize(entries),
+          [entries],
+        );
+
+        const filtered = useMemo(() => {
+          return entries.filter((e) => {
+            if (filterType !== "all" && e.type !== filterType) return false;
+            if (activeQueue) {
+              const isConsumerQueue = e.queue === activeQueue;
+              const isTargetQueue =
+                e.routedQueues && e.routedQueues.includes(activeQueue);
+              if (!isConsumerQueue && !isTargetQueue) return false;
+            }
+            if (query) {
+              const hay = JSON.stringify(e).toLowerCase();
+              if (!hay.includes(query.toLowerCase())) return false;
+            }
+            return true;
+          });
+        }, [entries, filterType, activeQueue, query]);
+
+        return (
+          <div className="wrap">
+            <header className="masthead">
+              <div>
+                <h1>RabbitMQ Routing Trace</h1>
+                <p className="sub">
+                  Every message published to{" "}
+                  <b style={{ color: "var(--ink)" }}>{exchange}</b> and how the
+                  topic exchange fanned it out to each bound queue.
+                </p>
+              </div>
+              <div className="source">
+                <div>
+                  <b>vhost</b> /
+                </div>
+                <div>
+                  <b>node</b> rabbit@rabbitmq
+                </div>
+                <div>
+                  <b>window</b> {fmtTime(entries[0]?.timestamp)}–
+                  {fmtTime(entries[entries.length - 1]?.timestamp)}
+                </div>
+              </div>
+            </header>
+
+            <div className="stat-row">
+              <div className="stat">
+                <div className="n" style={{ color: "var(--amber)" }}>
+                  {published.length}
+                </div>
+                <div className="l">messages published</div>
+              </div>
+              <div className="stat">
+                <div className="n">{received.length}</div>
+                <div className="l">deliveries to queues</div>
+              </div>
+              <div className="stat">
+                <div className="n">{Object.keys(queues).length}</div>
+                <div className="l">bound queues</div>
+              </div>
+              <div className="stat">
+                <div className="n">
+                  {published.length
+                    ? (received.length / published.length).toFixed(0)
+                    : 0}
+                  x
+                </div>
+                <div className="l">fan-out per message</div>
+              </div>
+            </div>
+
+            <p className="section-label">
+              Routing topology — click a queue to isolate its deliveries
+            </p>
+            <div className="diagram-panel">
+              <RoutingDiagram
+                entries={entries}
+                queues={queues}
+                exchange={exchange}
+                routingKey={routingKey}
+                activeQueue={activeQueue}
+                onSelectQueue={setActiveQueue}
+              />
+              <div className="legend">
+                <div className="legend-item">
+                  <span
+                    className="legend-dot"
+                    style={{ background: "var(--amber)" }}
+                  ></span>
+                  publish (producer → exchange)
+                </div>
+                <div className="legend-item">
+                  <span
+                    className="legend-dot"
+                    style={{ background: "var(--teal)" }}
+                  ></span>
+                  emailQueue delivery
+                </div>
+                <div className="legend-item">
+                  <span
+                    className="legend-dot"
+                    style={{ background: "var(--violet)" }}
+                  ></span>
+                  backOfficeQueue delivery
+                </div>
+              </div>
+            </div>
+
+            <p className="section-label">Log entries</p>
+            <div className="controls">
+              <button
+                className={"chip" + (filterType === "all" ? " active" : "")}
+                onClick={() => setFilterType("all")}
+              >
+                all ({entries.length})
+              </button>
+              <button
+                className={
+                  "chip" + (filterType === "published" ? " active" : "")
+                }
+                onClick={() => setFilterType("published")}
+              >
+                published ({published.length})
+              </button>
+              <button
+                className={
+                  "chip" + (filterType === "received" ? " active" : "")
+                }
+                onClick={() => setFilterType("received")}
+              >
+                received ({received.length})
+              </button>
+              {activeQueue && (
+                <button
+                  className="chip active"
+                  onClick={() => setActiveQueue(null)}
+                >
+                  queue: {activeQueue} ✕
+                </button>
+              )}
+              <input
+                className="search"
+                placeholder="search payload, connection…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="tbl-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>time</th>
+                    <th>event</th>
+                    <th>routing key</th>
+                    <th>target</th>
+                    <th>payload</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 && (
+                    <tr className="empty-row">
+                      <td colSpan="5">No entries match this filter.</td>
+                    </tr>
+                  )}
+                  {filtered.map((e) => (
+                    <tr key={e.id}>
+                      <td>{fmtTime(e.timestamp)}</td>
+                      <td>
+                        {e.type === "published" ? (
+                          <span className="badge pub">published</span>
+                        ) : (
+                          <span className={"badge " + queueBadgeClass(e.queue)}>
+                            {e.queue}
+                          </span>
+                        )}
+                      </td>
+                      <td>{e.routingKeys?.[0] || "—"}</td>
+                      <td>
+                        {e.type === "published"
+                          ? (e.routedQueues || []).join(", ")
+                          : e.queue}
+                      </td>
+                      <td>
+                        {e.payload ? (
+                          <>
+                            <span className="payload-field">trip=</span>
+                            <span className="payload-val">
+                              {e.payload.trip}
+                            </span>{" "}
+                            <span className="payload-field">type=</span>
+                            <span className="payload-val">
+                              {e.payload.tourtype}
+                            </span>{" "}
+                            <span className="payload-field">email=</span>
+                            <span className="payload-val">
+                              {e.payload.email}
+                            </span>
+                          </>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="footnote">
+              Parsed live from disk — {entries.length} entries.
+            </p>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>

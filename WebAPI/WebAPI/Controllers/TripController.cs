@@ -2,6 +2,7 @@
 using RabbitMQ.AMQP.Client;
 using RabbitMQ.AMQP.Client.Impl;
 using System.Text;
+using System.Text.Json;
 
 namespace WebAPI.Controllers;
 
@@ -11,6 +12,8 @@ public class TourInput
     public string email { get; set; }
     public string trip { get; set; }
     public string tourtype { get; set; }
+
+    public TourInput() { }
 }
 
 
@@ -23,9 +26,20 @@ public class TripController : ControllerBase
     {
         string routingKey = "tour." + ti.tourtype; // tourtype should be 'book' or 'cancel'
 
-        string message = ti.name + ti.email;
+        //string message = ti.name + ti.email;
+        TourInput input = new()
+        {
+            name = ti.name,
+            email = ti.email,
+            trip = ti.trip,
+        };
 
-        await Send_Message(message, routingKey);
+        Random r = new Random();
+        bool malformed = r.Next(0, 2) == 0 ? true : false;
+
+        if (malformed == true) input.tourtype = ti.tourtype;
+
+        await Send_Message(input, routingKey);
 
         return Ok("Received and did something.");
     }
@@ -33,17 +47,17 @@ public class TripController : ControllerBase
     const string brokerUri = "amqp://guest:guest@localhost:5672/%2f";
     const string exchangeName = "logs_topic";
 
-    const string queueNameBackOffice = "backOfficeQueue";
-    const string backOfficeBindingKey = "tour.*";
+    //const string queueNameBackOffice = "backOfficeQueue";
+    //const string backOfficeBindingKey = "tour.*";
             
-    const string queueNameEmail = "emailQueue";
-    const string emailBindingKey = "tour.book";
+    //const string queueNameEmail = "emailQueue";
+    //const string emailBindingKey = "tour.book";
 
     //const string dlxName = "tour-dlx";
     //const string dlqName = "tour-dlq";
     //const string dlqRoutingKey = "tour.dead";
 
-    async Task Send_Message(string message, string routingKey)
+    async Task Send_Message(TourInput message, string routingKey)
     {
         ConnectionSettings settings = ConnectionSettingsBuilder.Create()
             .Uri(new Uri(brokerUri))
@@ -104,7 +118,7 @@ public class TripController : ControllerBase
             IPublisher publisher = await connection.PublisherBuilder().Exchange(exchangeName).Key(routingKey).BuildAsync();
             try
             {
-                var amqpMessage = new AmqpMessage(Encoding.UTF8.GetBytes(message));
+                IMessage amqpMessage = new AmqpMessage(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message)));
                 PublishResult pr = await publisher.PublishAsync(amqpMessage);
                 switch (pr.Outcome.State)
                 {
@@ -112,15 +126,15 @@ public class TripController : ControllerBase
                         break;
                     case OutcomeState.Released:
                         Console.Error.WriteLine($"Released message: {pr.Message.BodyAsString()}");
-                        Environment.Exit(1);
+                        //Environment.Exit(1);
                         break;
                     case OutcomeState.Rejected:
                         Console.Error.WriteLine($"[Publisher] Message: {pr.Message.BodyAsString()} rejected with error: {pr.Outcome.Error}");
-                        Environment.Exit(1);
+                        //Environment.Exit(1);
                         break;
                     default:
                         Console.Error.WriteLine($"Unexpected publish outcome: {pr.Outcome.State}");
-                        Environment.Exit(1);
+                        //Environment.Exit(1);
                         break;
                 }
 

@@ -1,0 +1,10 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4.3.6-management
+    container_name: rabbitmqABC
+    hostname: rabbitmq
+    ports:
+      - "5673:5672"   # AMQP
+      - "15673:15672" # Management UI
+    volumes:
+      - ./logs:/var/tmp

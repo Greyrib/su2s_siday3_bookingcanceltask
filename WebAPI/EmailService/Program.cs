@@ -46,7 +46,7 @@ try
     IExchangeSpecification exchangeSpec = management.Exchange(exchangeName).Type("topic");
     await exchangeSpec.DeclareAsync();
 
-    IQueueSpecification tempQueue = management.Queue(queueNameEmail)/*.Exclusive(true).AutoDelete(true)*/;
+    IQueueSpecification tempQueue = management.Queue(queueNameEmail).Type(QueueType.QUORUM)/*.Exclusive(true).AutoDelete(true)*/;
     IQueueInfo queueInfo = await tempQueue.DeclareAsync();
     string queueName = queueInfo.Name();
 
